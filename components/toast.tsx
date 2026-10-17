@@ -4,14 +4,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLang } from "./lang";
 
 const TEXT: Record<string, [string, string]> = {
-  saved: ["Check saved", "检查已保存"],
   started: ["Check started", "检查开始了"],
   updated: ["Changes saved", "已保存更改"],
   deleted: ["Check deleted", "检查已删除"],
   rewriting: ["Changes saved. Rewriting the report", "已保存. 正在重写报告"],
 };
 
-// Shows the result of the last action (?toast=saved), then takes the word out of the address.
+// Shows the result of the last action (?toast=started), then takes the word out of the address.
 export function Toast() {
   const params = useSearchParams();
   const router = useRouter();

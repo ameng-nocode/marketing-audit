@@ -4,7 +4,7 @@ import { q } from "../db";
 import { Skipped, type Ctx } from "../collect/kit";
 import { loadReportData, type ReportData } from "./data";
 import { brief, FORMATS, loadTexts, saveWritten, WRITE_SCHEMA, zhPunct, type Written } from "./write";
-import { consultant, Consultant } from "../settings";
+import { consultant, Consultant, dayIn } from "../settings";
 
 // The 中文 (大马华语) report: written natively from the same facts by the AI (Opus), plus the 中文 of the
 // code's own words on the page (notes, photo captions, hook notes), by a second, cheaper call (Sonnet).
@@ -89,7 +89,7 @@ export async function writeReportZh(c: Ctx) {
   if (!d || !en.any) throw new Skipped("The English report is not written yet.");
   const rows = await q<{ section: string; key: string; position: number; body: string }>(
     `select section, key, position, body from texts where audit_id = $1 and lang = 'en' and section <> 'str' order by section, key, position`, [c.auditId]);
-  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  const today = dayIn();
   const w = await askJson<Written>({
     auditId: c.auditId, task: "write-report-zh", model: "opus", system: HOUSE_ZH, schema: ZH_SCHEMA, timeoutMs: 600000,
     prompt: `Write the 中文 report for ${d.biz.name}, for the owner to read. Cover the same points as the English report below, in the same JSON shape, written natively in 大马华语.

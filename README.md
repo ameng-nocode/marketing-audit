@@ -31,6 +31,8 @@ Before a first call with a new lead, a marketer checks the same things every tim
 
 This app does the same checks the same way every time, keeps a screenshot of everything it saw, and writes the report for you.
 
+**Who it's for.** It's built for **Malaysian businesses**: prices in RM, competitor searches in the Malaysian Meta Ad Library, search words in English, Chinese and Malay. The report is written for a **consultant**: someone who gives direction and teaches, while the business's own team makes the content and runs the ads. Put your name in `CONSULTANT_NAME` and the report uses it.
+
 ## What you get
 
 - **Form in, report out.** No stops in the middle.

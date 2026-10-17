@@ -3,17 +3,18 @@ import { HOUSE } from "../ai-rules";
 import { q } from "../db";
 import { shortUrl } from "../format";
 import { leadsTo } from "./adlib";
-import { isCaptcha, NotChecked, shotPath, Skipped, type Ctx } from "./kit";
+import { isCaptcha, NotChecked, pageSetup, shotPath, Skipped, type Ctx } from "./kit";
 
 // Check 5: what they ask customers to do. Landing pages (top of the page, desktop and phone),
-// the above-the-fold checklist, buying steps and dead links (skill step 6).
+// the above-the-fold checklist, buying steps and dead links.
 
 const PHONE = { width: 390, height: 844 };
 const DESK = { width: 1366, height: 900 };
 
 // What the first screen of a page shows: headline, buttons, tracking.
 async function firstScreen(c: Ctx) {
-  return c.page.evaluate(() => {
+  const setup = await c.page.evaluate(pageSetup);
+  const screen = await c.page.evaluate(() => {
     const vh = innerHeight;
     const vis = (el: Element) => {
       const r = el.getBoundingClientRect();
@@ -35,18 +36,9 @@ async function firstScreen(c: Ctx) {
     const buttons = [...new Set([...document.querySelectorAll<HTMLElement>("a,button,[role=button]")].filter(vis)
       .map((e) => (e.innerText || e.getAttribute("aria-label") || "").trim().replace(/\s+/g, " "))
       .filter((t) => t && t.length < 40 && /buy|shop|order|cart|whatsapp|contact|book|get |call|chat|enquir|quote|start|try|sign up|register|claim|beli|hubungi|tempah|购买|下单|联系|预约|咨询|立即|询价/i.test(t)))].slice(0, 8);
-    const w = window as unknown as Record<string, unknown>;
-    const s = [...document.scripts].map((x) => x.src + " " + x.text.slice(0, 400)).join("\n");
-    const html = document.documentElement.innerHTML;
-    return {
-      headline, buttons,
-      meta: typeof w.fbq === "function" || /fbevents/i.test(s),
-      ga: typeof w.gtag === "function" || !!w.google_tag_manager || /googletagmanager|google-analytics/i.test(s),
-      whatsapp: !!document.querySelector('a[href*="wa.me"],a[href*="whatsapp"]'),
-      platform: w.Shopify ? "Shopify" : /wp-content/.test(html) ? "WordPress" : /wixstatic/.test(html) ? "Wix" : /squarespace/.test(html) ? "Squarespace" : null,
-      text: document.body.innerText.slice(0, 2500),
-    };
+    return { headline, buttons, text: document.body.innerText.slice(0, 2500) };
   });
+  return { ...screen, meta: setup.meta, ga: setup.ga, whatsapp: setup.whatsapp.length > 0, platform: setup.platform };
 }
 
 // Latin words count one each; Chinese characters count one word per 2 (a short Chinese headline is about 10 to 16 characters).
@@ -188,7 +180,7 @@ result: ok, weak or none. note: one short line saying what you see (quote the he
   }
 }
 
-// Buying steps and dead links on their website (skill step 6: buying steps, other ways in, broken or missing).
+// Buying steps and dead links on their website: how people buy, other ways in, what is broken or missing.
 export async function buying(c: Ctx) {
   const url = c.biz.website!;
   let status = 0;

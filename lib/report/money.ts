@@ -11,16 +11,16 @@ export type Funnel = "chat" | "lead" | "checkout";
 type Two = [string, string]; // [English, 中文]
 
 // one = "chat" / "每个聊天", many = "chats" / "个聊天".
-const UNIT_WORD: Record<Unit, { one: Two; many: Two }> = {
+export const UNIT_WORD: Record<Unit, { one: Two; many: Two }> = {
   chat: { one: ["chat", "每个聊天"], many: ["chats", "个聊天"] },
   lead: { one: ["lead", "每个 lead"], many: ["leads", "个 lead"] },
-  purchase: { one: ["purchase", "每单购买"], many: ["purchases", "单购买"] },
+  purchase: { one: ["purchase", "一单购买"], many: ["purchases", "单购买"] },
   click: { one: ["click", "每次点击"], many: ["clicks", "次点击"] },
   other: { one: ["result", "每个成效"], many: ["results", "个成效"] },
 };
 const CUSTOMER: Unit[] = ["chat", "lead", "purchase"];
 
-// What one result is: the AI's label, or the words in the Results column for rows read before the label existed.
+// What one result is: the AI's label, else the words in the Results column.
 export function unitOf(r: Pick<RAmRow, "result_type" | "results" | "kind">): Unit {
   if (r.result_type && r.result_type in UNIT_WORD) return r.result_type as Unit;
   const t = (r.results ?? "").toLowerCase();
@@ -107,14 +107,14 @@ export function breakEvenLine(m: Money, zh: boolean): string | null {
   const left = m.profit.lo === m.profit.hi ? rm(m.profit.lo) : `${rm(m.profit.lo)} ${zh ? "到" : "to"} ${rm(m.profit.hi)}`;
   if (m.perSale) {
     const after = m.perSale.left.lo === m.perSale.left.hi ? rm(m.perSale.left.lo) : `${rm(m.perSale.left.lo)} ${zh ? "到" : "to"} ${rm(m.perSale.left.hi)}`;
-    if (m.perSale.left.hi <= 0) return zh ? `每单购买花 ${rm(m.cpr)} 广告费, 每单只留下 ${left}. 卖越多亏越多.` : `Each purchase costs ${rm(m.cpr)} in ads and leaves ${left}. Every sale loses money.`;
-    return zh ? `每单购买花 ${rm(m.cpr)} 广告费, 每单留下 ${left}. 扣掉广告还剩 ${after}.` : `Each purchase costs ${rm(m.cpr)} in ads and leaves ${left}. After ads, ${after} is left.`;
+    if (m.perSale.left.hi <= 0) return zh ? `卖一单要花 ${rm(m.cpr)} 广告费, 一单只赚 ${left}. 卖越多亏越多.` : `Each purchase costs ${rm(m.cpr)} in ads and leaves ${left}. Every sale loses money.`;
+    return zh ? `卖一单要花 ${rm(m.cpr)} 广告费, 一单赚 ${left}. 扣掉广告还剩 ${after}.` : `Each purchase costs ${rm(m.cpr)} in ads and leaves ${left}. After ads, ${after} is left.`;
   }
   const be = m.breakEven!;
   if (be.hi < 1) return zh ? `${w.one[1]}要 ${rm(m.cpr)}, 比一单的利润 ${left} 还多. 就算每个都成交, 广告也是亏.` : `Each ${w.one[0]} costs ${rm(m.cpr)}, more than one sale leaves (${left}). The ads lose money even if every ${w.one[0]} buys.`;
   const n = be.lo === be.hi ? `${be.lo}` : `${be.lo} ${zh ? "到" : "to"} ${be.hi}`;
   return zh
-    ? `${w.one[1]} ${rm(m.cpr)}, 每单留下 ${left}. 只要每 ${n} ${w.many[1]}有 1 个成交, 广告就回本.`
+    ? `${w.one[1]}要 ${rm(m.cpr)}, 一单赚 ${left}. 只要 ${n} ${w.many[1]}里有 1 个成交, 广告就回本.`
     : `Each ${w.one[0]} costs ${rm(m.cpr)}. Each sale leaves ${left}. The ads pay for themselves as long as 1 in ${n} ${w.many[0]} buys.`;
 }
 
@@ -127,7 +127,7 @@ export function ownerQuestions(m: Money, zh: boolean): string[] {
   if (m.funnel === "lead") out.push(zh ? `截图里的 ${n} 个 lead, 有几个接电话, 几个见面, 几个买了?` : `Out of the ${n} leads in these screenshots, how many answered the call, how many met you, and how many bought?`);
   if (m.funnel === "checkout") out.push(zh ? "Ads Manager 的购买数字, 跟网店后台的订单对得上吗?" : "Do the purchases in Ads Manager match the orders in the shop's own system?");
   if (!m.price) out.push(zh ? "平时一单卖多少钱?" : "What does one sale usually cost the customer?");
-  if (!m.profit) out.push(zh ? "扣掉产品或服务的成本, 每单留下多少?" : "After the cost of the product or service, what do you keep from one sale?");
+  if (!m.profit) out.push(zh ? "扣掉产品或服务的成本, 一单赚多少?" : "After the cost of the product or service, what do you keep from one sale?");
   return out.map((q) => q.replace(/ {2,}/g, " "));
 }
 

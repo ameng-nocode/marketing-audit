@@ -6,7 +6,7 @@ import { q } from "../db";
 import { openAd, readResults, saveFound } from "./adlib";
 import { NotChecked, Skipped, type Ctx } from "./kit";
 
-// Check 3, added in step 3: their own live ads (opened like competitor ads) and the Ads Manager screenshots.
+// Check 3: their own live ads (opened like competitor ads) and the Ads Manager screenshots.
 
 export async function ownAds(c: Ctx) {
   const [b] = await q<{ facebook_page_id: string | null }>(`select facebook_page_id from businesses where facebook_url = $1`, [c.biz.facebook_url]);

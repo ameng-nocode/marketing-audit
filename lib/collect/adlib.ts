@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
 import { q } from "../db";
-import { clearFbPopup, dayOf, isLoginWall, NotChecked, type Ctx } from "./kit";
+import { clearFbPopup, dayOf, ffmpeg, isLoginWall, NotChecked, type Ctx } from "./kit";
 
-// Meta Ad Library, logged out: the search results list (skill snippet S7) and one ad in its box (S8).
+// Meta Ad Library, logged out: the search results list and one ad in its box.
 
 export type FoundAd = { id: string; started: string | null; versions: number | null; page: string | null; text: string | null; cta: string | null };
 
@@ -61,18 +60,12 @@ export async function saveFound(c: Ctx, ads: FoundAd[], o: { own: boolean; word?
 
 // First 4 seconds of a video as one strip of 4 frames (0, 1, 2, 3 s). The video link is only good for a while, so it runs now.
 export function frameStrip(src: string, out: string) {
-  return new Promise<void>((resolve, reject) => {
-    execFile("ffmpeg", ["-y", "-loglevel", "error", "-t", "4", "-i", src, "-vf", "fps=1,scale=300:-2,tile=4x1:padding=8:color=white", "-frames:v", "1", "-q:v", "3", out],
-      { timeout: 60000, windowsHide: true }, (e) => (e ? reject(e) : resolve()));
-  });
+  return ffmpeg(["-t", "4", "-i", src, "-vf", "fps=1,scale=300:-2,tile=4x1:padding=8:color=white", "-frames:v", "1", "-q:v", "3", out]);
 }
 
 // One clear frame of a video ad (at 0.5 s), as the ad's picture.
 export function firstFrame(src: string, out: string) {
-  return new Promise<void>((resolve, reject) => {
-    execFile("ffmpeg", ["-y", "-loglevel", "error", "-ss", "0.5", "-i", src, "-frames:v", "1", "-vf", "scale=600:-2", "-q:v", "3", out],
-      { timeout: 60000, windowsHide: true }, (e) => (e ? reject(e) : resolve()));
-  });
+  return ffmpeg(["-ss", "0.5", "-i", src, "-frames:v", "1", "-vf", "scale=600:-2", "-q:v", "3", out]);
 }
 
 // Open one ad in its box: full text, start date, link, video length, a screenshot of the box and the first frames.

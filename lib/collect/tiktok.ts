@@ -1,7 +1,6 @@
-import { execFile } from "node:child_process";
 import { apifyKey, runActor } from "../apify";
 import { q } from "../db";
-import { isCaptcha, type Ctx } from "./kit";
+import { ffmpeg, isCaptcha, type Ctx } from "./kit";
 
 // TikTok: the free browser check first. When TikTok shows its slider puzzle (it usually does), the app never
 // solves it; Apify's TikTok Profile Scraper reads the profile and the newest 10 videos instead (at most 2 handles).
@@ -21,9 +20,7 @@ const n = (x: number | undefined) => (x ?? 0).toLocaleString("en-US");
 
 // A video cover from TikTok's picture server, made into a small JPEG (covers can be WebP).
 function cover(src: string, out: string) {
-  return new Promise<void>((resolve, reject) => {
-    execFile("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "3", out], { timeout: 30000, windowsHide: true }, (e) => (e ? reject(e) : resolve()));
-  });
+  return ffmpeg(["-i", src, "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "3", out], 30000);
 }
 
 async function viaApify(c: Ctx, h: string, url: string, puzzleShotId: string | null, owner: string) {

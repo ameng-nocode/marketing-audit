@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import type { Lang } from "@/lib/i18n";
 import { useLang } from "./lang";
 import { ViewerDialog, useViewer, type Shot } from "./viewer";
 
 // The finished report, shown in the check page in its own look. It grows to its full height (no inner scroll);
 // a photo click opens the app's viewer, a jump link scrolls this page.
-export function ReportFrame({ id, stamp, lang }: { id: string; stamp: string; lang: "en" | "zh" }) {
+export function ReportFrame({ id, stamp, lang }: { id: string; stamp: string; lang: Lang }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(1200);
   const [shots, setShots] = useState<Shot[]>([]);

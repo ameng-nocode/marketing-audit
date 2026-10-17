@@ -1,4 +1,4 @@
-// End-to-end test of the G question flow on a throwaway copy of the app: own database, own uploads folder, port 3131.
+// End-to-end test of the question flow on a throwaway copy of the app: own database, own uploads folder, port 3131.
 // Nothing here touches the real data in .data/pg. Every record it makes is named "TEST ...".
 //   npm run test:flow
 // Screenshots for the visual check land in .data/shots/ (390, 1440, 1920 and 2788 wide).
@@ -48,13 +48,17 @@ const shop = http.createServer((req, res) => {
 
 console.log("Starting test server on", BASE);
 const server = spawn(`npx next dev -p ${PORT} -H 127.0.0.1`, {
-  cwd: ROOT, shell: true, stdio: ["ignore", "pipe", "pipe"],
+  cwd: ROOT, shell: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32",
   env: { ...process.env, PGLITE_DIR: ".data/test-pg", UPLOADS_DIR: ".data/test-uploads", NEXT_DIST_DIR: ".next-test", COLLECT_ONLY: "website,tracking,ads_manager,landings,fold_review,buying,write,write_zh,render", AI_FAKE: "1" },
 });
 let log = "";
 server.stdout.on("data", (d) => (log += d));
 server.stderr.on("data", (d) => (log += d));
-const stop = () => { try { execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: "ignore" }); } catch {} shop.close(); };
+// The server and its children: taskkill on Windows, the whole process group elsewhere.
+const stop = () => {
+  try { if (process.platform === "win32") execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: "ignore" }); else process.kill(-server.pid, "SIGTERM"); } catch {}
+  shop.close();
+};
 
 // Wait for the server's own "Ready" line (no polling).
 await new Promise((resolve, reject) => {
@@ -161,7 +165,7 @@ try {
   check("highest can't be below lowest", await seen(p.getByText("The highest price is lower than the lowest one.")));
   await p.fill("#q-price-low", "12,000");
   await p.fill("#q-price-high", "16k");
-  await p.fill("#q-price-unit", "per person");
+  await p.getByRole("group", { name: "The price is per" }).getByRole("button", { name: "Person", exact: true }).click();
   await shot(p, "1440-q-price");
   await p.getByRole("button", { name: "Continue", exact: true }).click();
   check("question 6 (profit) shows", await seen(heading(p, "What do they keep from one sale?")));
@@ -181,7 +185,7 @@ try {
   await p.locator('input[type="file"]').setInputFiles(pics);
   check("2 thumbnails with remove buttons", (await p.getByRole("button", { name: /Remove test-ads/ }).count()) === 2);
   check("count shows 2 of 20", await p.getByText("2 of 20", { exact: false }).isVisible());
-  await shot(p, "1440-q5-yes");
+  await shot(p, "1440-q7-yes");
   await p.getByRole("button", { name: "Continue", exact: true }).click();
 
   console.log("\nAnswers screen");
@@ -272,7 +276,7 @@ try {
   await p.getByRole("button", { name: "写中文报告" }).click();
   check("the 中文 report gets written", await seen(p.frameLocator('iframe[title="报告"]').getByRole("heading", { name: "重点总结" }), 60000));
   const zf = p.frameLocator('iframe[title="报告"]');
-  check("中文 labels from the approved report (渠道, 我们的建议)", await seen(zf.locator("#channels h2", { hasText: "渠道" })) && await zf.locator("#plan h2", { hasText: "我们的建议" }).isVisible());
+  check("中文 section names (渠道, 我们的建议)", await seen(zf.locator("#channels h2", { hasText: "渠道" })) && await zf.locator("#plan h2", { hasText: "我们的建议" }).isVisible());
   const zhText = await zf.locator("main").innerText();
   check("中文: half-width , and . only, no ； or ， or ——", !/[；，。——]/.test(zhText), zhText.match(/.{0,20}[；，。——].{0,20}/)?.[0]);
   check("中文: the code's own notes come through in 中文", /TEST 中文 \d+/.test(zhText));
@@ -354,7 +358,7 @@ try {
   check("edit opens on the answers", await seen(heading(p, "Ready to check TEST Company Sdn Bhd.")));
   check("answers show the 2 saved screenshots", await p.locator(".g-sum").getByText("Yes, 2 screenshots").isVisible());
   await p.getByRole("button", { name: "Change Running ads" }).click();
-  check("question 5 shows the saved thumbnails", await seen(p.getByRole("button", { name: /Remove test-ads-1/ })));
+  check("question 7 shows the saved thumbnails", await seen(p.getByRole("button", { name: /Remove test-ads-1/ })));
   await radio(p, "No").click();
   check("warns the screenshots will go", await seen(p.getByText("The 2 saved screenshots will be removed when you save.")));
   check("No goes back to the answers", await seen(heading(p, "Ready to check TEST Company Sdn Bhd.")));

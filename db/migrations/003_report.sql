@@ -1,4 +1,4 @@
--- Step 3: checks 4 to 6 (competitors, call to action, creative) and the report (check 7 in the run list).
+-- Checks 4 to 6 (competitors, call to action, creative) and the report (check 7 in the run list).
 
 alter table audit_steps drop constraint audit_steps_check_no_check;
 alter table audit_steps add constraint audit_steps_check_no_check check (check_no between 1 and 7);

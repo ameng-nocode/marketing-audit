@@ -1,4 +1,4 @@
--- Step 2: running checks 1 to 3. Each check run has steps; each step saves facts and screenshots.
+-- Running a check: each run has steps; each step saves facts and screenshots.
 
 alter table businesses add column facebook_page_id text;
 alter table audits add column started_at timestamptz;

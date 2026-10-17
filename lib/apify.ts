@@ -1,6 +1,6 @@
 import { q } from "./db";
 
-// Apify, only when the free browser check is blocked (skill rule: "Apify only if Playwright can't get it").
+// Apify, only when the free browser check is blocked (the browser goes first, Apify only when it can't get the page).
 // The key lives in .env.local (APIFY_API_KEY, see .env.example). No key = no Apify, the step says so.
 
 export const apifyKey = () => process.env.APIFY_API_KEY?.trim() || null;

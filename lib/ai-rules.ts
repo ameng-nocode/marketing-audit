@@ -1,5 +1,5 @@
-// House rules every AI call starts with (from the marketing-audit skill and the consultant's notes).
-import { consultant, Consultant } from "./settings";
+// House rules every AI call starts with.
+import { consultant, Consultant, consultantName } from "./settings";
 
 // Words that make copy sound machine-written. The text check flags them too (lib/report/render.ts).
 export const SLOP_WORDS = [
@@ -10,7 +10,7 @@ export const SLOP_WORDS = [
 ];
 
 const who = consultant();
-export const HOUSE = `You help ${who === "the consultant" ? "a Malaysian digital marketing consultant" : `${who}, a Malaysian digital marketing consultant,`} check a business that might become their client.
+export const HOUSE = `You help ${consultantName ? `${consultantName}, a Malaysian digital marketing consultant,` : "a Malaysian digital marketing consultant"} check a business that might become their client.
 Rules:
 - Plain, simple English. Short sentences. Words people say out loud. No jargon.
 - Never invent a number, a name or a fact. Use only what the data you are given shows. If something is not in the data, say it was not checked.

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { saveCheckAction, type FormState } from "@/lib/actions";
-import { checkFields, checkFile, MAX_FILES, normalizeFacebook, normalizeWebsite, parseMoney, parsePct, priceText, profitText, RUNNING_ADS, runningAdsLabel, shortUrl, type FieldErrors } from "@/lib/format";
+import { bareUnit, checkFields, checkFile, MAX_FILES, normalizeFacebook, normalizeWebsite, parseMoney, parsePct, PRICE_UNITS, priceText, profitText, RUNNING_ADS, runningAdsLabel, shortUrl, type FieldErrors } from "@/lib/format";
 import { BrandIcon, ChannelStrip, facebook } from "./brand";
 import { IconArrow, IconCheck, IconUpload, IconX } from "./icons";
 import { Modal } from "./modal";
@@ -26,7 +26,7 @@ const DONE = TOTAL + 1;
 const STEP_OF: [keyof FieldErrors, number][] = [["facebook", 1], ["name", 2], ["website", 3], ["price", 5], ["profit", 6], ["running_ads", 7], ["files", 7]];
 const KEYS = ["A", "B", "C"];
 
-// The G flow: one question per screen, then the answers with Change, then Save.
+// The start flow: one question per screen, then the answers with Change, then Save.
 // New check starts at question 1; Edit starts on the answers screen.
 export function Intake({ id, initial, existing = [] }: { id?: string; initial?: FormValues; existing?: Existing[] }) {
   const editing = !!id;
@@ -42,6 +42,8 @@ export function Intake({ id, initial, existing = [] }: { id?: string; initial?: 
   const [dirty, setDirty] = useState(false);
   const [over, setOver] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  // "Other" price unit: open when a typed unit (not one of the choices) is already there.
+  const [otherUnit, setOtherUnit] = useState(() => !!bareUnit(initial?.price_unit) && !PRICE_UNITS.some((u) => u.key === initial?.price_unit));
   const submitting = useRef(false);
 
   const yes = v.running_ads === "yes";
@@ -163,7 +165,7 @@ export function Intake({ id, initial, existing = [] }: { id?: string; initial?: 
     { n: 3, label: tr("Website", "网站"), value: v.website.trim() ? shortUrl(normalizeWebsite(v.website) ?? v.website) : "" },
     { n: 4, label: tr("What they sell", "卖什么"), value: v.description.trim() },
     { n: 5, label: tr("Price", "售价"), value: priceText(parseMoney(v.price_low), parseMoney(v.price_high), v.price_unit.trim() || null, lang) },
-    { n: 6, label: tr("Profit per sale", "每单利润"), value: v.profit.trim() ? profitText(v.profit_kind === "rm" ? parseMoney(v.profit) : null, v.profit_kind === "pct" ? parsePct(v.profit) : null, lang) : "" },
+    { n: 6, label: tr("Profit per sale", "一单赚多少"), value: v.profit.trim() ? profitText(v.profit_kind === "rm" ? parseMoney(v.profit) : null, v.profit_kind === "pct" ? parsePct(v.profit) : null, lang) : "" },
     { n: 7, label: tr("Running ads", "有跑广告吗"), value: v.running_ads ? `${runningAdsLabel(v.running_ads, lang)}${yes ? `, ${shots(count)}` : ""}` : "" },
   ];
 
@@ -226,8 +228,18 @@ export function Intake({ id, initial, existing = [] }: { id?: string; initial?: 
                 <span className="g-money-to">{tr("to", "到")}</span>
                 <Bar id="q-price-high" label={tr("Highest price in RM", "最高价 (RM)")} value={v.price_high} onChange={(x) => set("price_high", x)} onKeyDown={enter} pre="RM" num noFocus />
               </div>
-              <Bar id="q-price-unit" label={tr("Per what", "以什么算")} value={v.price_unit} onChange={(x) => set("price_unit", x)} onKeyDown={enter} pre={tr("per", "每")} noFocus />
-              {err ? <p className="g-err" role="alert">{err}</p> : <p className="g-hint">{tr("One price only: fill the first box. Per what: person, order, package.", "只有一个价钱: 填第一格就好. 以什么算: 每人, 每单, 每个配套.")}</p>}
+              <div className="g-unit-pick">
+                <span className="g-unit-label">{tr("The price is per", "价钱是")}</span>
+                <div className="g-seg" role="group" aria-label={tr("The price is per", "价钱是")}>
+                  {PRICE_UNITS.map((u) => (
+                    <button key={u.key} type="button" className="g-seg-btn" aria-pressed={!otherUnit && v.price_unit === u.key}
+                      onClick={() => { setOtherUnit(false); set("price_unit", v.price_unit === u.key && !otherUnit ? "" : u.key); }}>{tr(u.en, u.zh)}</button>
+                  ))}
+                  <button type="button" className="g-seg-btn" aria-pressed={otherUnit} onClick={() => { setOtherUnit(!otherUnit); set("price_unit", ""); }}>{tr("Other", "其他")}</button>
+                </div>
+              </div>
+              {otherUnit && <Bar id="q-price-unit" label={tr("The price is per", "价钱是每")} value={v.price_unit} onChange={(x) => set("price_unit", x)} onKeyDown={enter} pre={tr("per", "每")} />}
+              {err ? <p className="g-err" role="alert">{err}</p> : <p className="g-hint">{tr("One price only: fill the first box. Then pick what the price is for, if you know.", "只有一个价钱的话, 填第一格就好. 然后选价钱是怎么算的, 不确定可以不选.")}</p>}
               <button type="button" className="g-btn" onClick={next}>{tr("Continue", "继续")} <IconArrow size={18} /></button>
               <button type="button" className="g-skip" onClick={() => skip("price")}>{tr("Not sure", "不确定")}</button>
             </>
@@ -235,13 +247,13 @@ export function Intake({ id, initial, existing = [] }: { id?: string; initial?: 
 
           {step === 6 && (
             <>
-              <h1 className="g-h">{tr("What do they keep from one sale?", "每卖一单, 他们赚多少?")}</h1>
+              <h1 className="g-h">{tr("What do they keep from one sale?", "他们一单赚多少?")}</h1>
               <p className="g-sub">{tr("After the cost of the product or service, before ads. With the cost per lead, this shows if the ads pay.", "扣掉产品或服务的成本, 还没算广告. 配合每个 lead 的成本, 就知道广告有没有赚.")}</p>
               <div className="g-seg" role="group" aria-label={tr("Profit as", "利润用")}>
-                <button type="button" className="g-seg-btn" aria-pressed={v.profit_kind !== "pct"} onClick={() => set("profit_kind", "rm")}>{tr("RM per sale", "每单 RM")}</button>
+                <button type="button" className="g-seg-btn" aria-pressed={v.profit_kind !== "pct"} onClick={() => set("profit_kind", "rm")}>{tr("RM per sale", "RM 金额")}</button>
                 <button type="button" className="g-seg-btn" aria-pressed={v.profit_kind === "pct"} onClick={() => set("profit_kind", "pct")}>{tr("Margin %", "利润率 %")}</button>
               </div>
-              <Bar key={v.profit_kind} id="q-profit" label={v.profit_kind === "pct" ? tr("Margin in %", "利润率 (%)") : tr("Profit per sale in RM", "每单利润 (RM)")} value={v.profit} bad={!!err} onChange={(x) => set("profit", x)} onKeyDown={enter} onGo={next} pre={v.profit_kind === "pct" ? undefined : "RM"} post={v.profit_kind === "pct" ? "%" : undefined} num />
+              <Bar key={v.profit_kind} id="q-profit" label={v.profit_kind === "pct" ? tr("Margin in %", "利润率 (%)") : tr("Profit per sale in RM", "一单赚多少 (RM)")} value={v.profit} bad={!!err} onChange={(x) => set("profit", x)} onKeyDown={enter} onGo={next} pre={v.profit_kind === "pct" ? undefined : "RM"} post={v.profit_kind === "pct" ? "%" : undefined} num />
               {err ? <p className="g-err" role="alert">{err}</p> : <p className="g-hint">{tr("A rough number is fine. Press Enter to go on.", "大概的数字就可以. 按 Enter 继续.")}</p>}
               <button type="button" className="g-skip" onClick={() => skip("profit")}>{tr("Not sure", "不确定")}</button>
             </>
@@ -272,7 +284,7 @@ export function Intake({ id, initial, existing = [] }: { id?: string; initial?: 
                     <span>
                       <b>{tr("Add their Ads Manager screenshots", "放上他们的 Ads Manager 截图")}</b>
                       <span className="t">{tr("Anything with numbers: amount spent, results, cost per result, reach. Add as many as they have.", "有数字的都可以: 花了多少钱, 成果, 每个成果的成本, 触及人数. 有几张就放几张.")}</span>
-                      <span className="t">{tr(`Click, drop or paste. PNG or JPG, up to 10 MB each. ${count} of ${MAX_FILES}.`, `点击, 拖进来或直接贴上. PNG 或 JPG, 每张最多 10 MB. 已放 ${count} 张, 最多 ${MAX_FILES} 张.`)}</span>
+                      <span className="t">{tr(`Click, drop or paste. PNG, JPG or WebP, up to 10 MB each. ${count} of ${MAX_FILES}.`, `点击, 拖进来或直接贴上. PNG, JPG 或 WebP, 每张最多 10 MB. 已放 ${count} 张, 最多 ${MAX_FILES} 张.`)}</span>
                     </span>
                   </label>
                   {count > 0 && (

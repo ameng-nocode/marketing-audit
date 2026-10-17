@@ -1,12 +1,12 @@
 // Shared by the form (in the browser) and the server, so both apply the same rules.
 import { pick, type Lang } from "./i18n";
+import { TIME_ZONE } from "./settings";
 
 export const RUNNING_ADS = [
   { value: "yes", label: "Yes", zh: "有" },
   { value: "no", label: "No", zh: "没有" },
   { value: "not_sure", label: "Not sure", zh: "不确定" },
 ] as const;
-export type RunningAds = (typeof RUNNING_ADS)[number]["value"];
 export const runningAdsLabel = (v: string, lang: Lang = "en") => {
   const r = RUNNING_ADS.find((x) => x.value === v);
   return r ? pick(lang, r.label, r.zh) : v;
@@ -56,22 +56,17 @@ export function normalizeWebsite(raw: string): string | null {
 // What a link looks like in a list: no https://, no www.
 export const shortUrl = (url: string) => url.replace(/^https?:\/\//, "").replace(/^www\./, "");
 
-// All dates show in Malaysia time, whatever the computer's own clock is set to.
-// APP_TIMEZONE in .env.local changes it (the browser bundle always uses the default).
-const MY = (typeof process !== "undefined" && process.env.APP_TIMEZONE) || "Asia/Kuala_Lumpur";
+// All dates show in the app's time zone (APP_TIMEZONE, Malaysia by default), whatever the computer's own clock is set to.
 export function myDateTime(iso: string, lang: Lang = "en") {
   const d = new Date(iso);
   if (lang === "zh") {
-    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: MY, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(d).map((x) => [x.type, x.value]));
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(d).map((x) => [x.type, x.value]));
     return `${p.year}年${p.month}月${p.day}日 ${p.dayPeriod?.toLowerCase() === "pm" ? "下午" : "上午"}${p.hour}:${p.minute}`;
   }
-  const date = d.toLocaleDateString("en-GB", { timeZone: MY, day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-US", { timeZone: MY, hour: "numeric", minute: "2-digit" }).toLowerCase();
+  const date = d.toLocaleDateString("en-GB", { timeZone: TIME_ZONE, day: "numeric", month: "short", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" }).toLowerCase();
   return `${date}, ${time}`;
 }
-
-export const fileSize = (bytes: number) =>
-  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export type FieldErrors = Partial<Record<"facebook" | "name" | "website" | "price" | "profit" | "running_ads" | "files", string>>;
 
@@ -87,13 +82,13 @@ export const parsePct = (raw: string): number | null => {
   const m = raw.trim().replace(/%$/, "").trim().match(/^\d+(?:\.\d+)?$/);
   return m && +m[0] > 0 && +m[0] <= 100 ? +m[0] : null;
 };
-export type Money = { price_low: string; price_high: string; profit: string; profit_kind: string };
-export const PROFIT_KINDS = ["rm", "pct"] as const;
+// The price and profit answers as typed in the form.
+export type MoneyInput = { price_low: string; price_high: string; profit: string; profit_kind: string };
 // RM16,000 (whole ringgit, or 2 decimals when there are cents).
 export const rm = (n: number) => `RM${n.toLocaleString("en-US", { maximumFractionDigits: n % 1 ? 2 : 0 })}`;
 
 // The checks both sides run before saving. Files are checked separately (the browser and server see them differently).
-export function checkFields(v: { facebook: string; name: string; website: string; running_ads: string } & Partial<Money>, lang: Lang = "en"): FieldErrors {
+export function checkFields(v: { facebook: string; name: string; website: string; running_ads: string } & Partial<MoneyInput>, lang: Lang = "en"): FieldErrors {
   const t = (en: string, zh: string) => pick(lang, en, zh);
   const e: FieldErrors = {};
   const lo = v.price_low?.trim() ? parseMoney(v.price_low) : null;
@@ -125,17 +120,26 @@ export function checkFile(f: { type: string; size: number; name: string }, lang:
   return null;
 }
 
-// How the price and profit answers read on the answers screen, the check page and the report.
-// The "per what" word without its own "per" or 每 (the box already shows it).
+// What the price is for: picked from these, or typed under "Other". Saved as the key (person) or the typed word.
+export const PRICE_UNITS = [
+  { key: "person", en: "Person", zh: "每人" },
+  { key: "order", en: "Order", zh: "每单" },
+  { key: "package", en: "Package", zh: "每个配套" },
+] as const;
+// A typed unit without its own "per" or 每.
 export const bareUnit = (unit: string | null | undefined) => (unit ?? "").trim().replace(/^(per\s+|每\s*)/i, "").trim();
+// How the price answer reads on the answers screen, the check page and the report.
 export function priceText(lo: number | null, hi: number | null, unit: string | null, lang: Lang = "en") {
   if (!lo) return "";
   const range = hi && hi !== lo ? `${rm(lo)} ${pick(lang, "to", "到")} ${rm(hi)}` : rm(lo);
   const u = bareUnit(unit);
-  return u ? `${range} ${lang === "zh" ? `每${/^[一-鿿]/.test(u) ? "" : " "}${u}` : `per ${u}`}` : range;
+  if (!u) return range;
+  const known = PRICE_UNITS.find((x) => x.key === u);
+  if (known) return `${range} ${pick(lang, `per ${known.key}`, known.zh)}`;
+  return `${range} ${lang === "zh" ? `每${/^[一-鿿]/.test(u) ? "" : " "}${u}` : `per ${u}`}`;
 }
 export function profitText(rmAmount: number | null, pct: number | null, lang: Lang = "en") {
-  if (rmAmount) return pick(lang, `${rm(rmAmount)} per sale`, `每单 ${rm(rmAmount)}`);
+  if (rmAmount) return pick(lang, `${rm(rmAmount)} per sale`, `一单赚 ${rm(rmAmount)}`);
   if (pct) return pick(lang, `${pct}% margin`, `利润率 ${pct}%`);
   return "";
 }

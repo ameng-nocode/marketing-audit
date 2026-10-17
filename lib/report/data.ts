@@ -1,4 +1,5 @@
 import { one, q } from "../db";
+import type { Lang } from "../i18n";
 
 // Everything one check collected, in one object: what the AI writer reads and what the report page shows.
 
@@ -28,7 +29,7 @@ export type RFunnel = { letter: string; name: string; note: string | null; steps
 export type ReportData = NonNullable<Awaited<ReturnType<typeof loadReportData>>>;
 
 // lang picks the funnel names and steps (the 中文 writer makes its own; English when there are none yet).
-export async function loadReportData(auditId: string, lang: "en" | "zh" = "en") {
+export async function loadReportData(auditId: string, lang: Lang = "en") {
   const biz = await one<{
     name: string; facebook_url: string; website: string | null; description: string | null; running_ads: string; created_at: string; started_at: string | null; finished_at: string | null;
     price_low: number | null; price_high: number | null; price_unit: string | null; profit_rm: number | null; profit_pct: number | null;
@@ -68,7 +69,7 @@ export async function loadReportData(auditId: string, lang: "en" | "zh" = "en") 
   return { auditId, biz, facts, shots, reels, ads, hooks, landings, amRows, uploads, steps, funnels, tiktok, logoId: logo?.id ?? null };
 }
 
-// Reels posted per month, for the 7 months up to the check date (skill step 6b), so a stop in posting shows as empty months.
+// Reels posted per month, for the 7 months up to the check date, so a stop in posting shows as empty months.
 export function reelMonths(reels: { posted_on: string | null }[], today: string, n = 7) {
   const days = reels.map((r) => r.posted_on).filter((d): d is string => !!d).sort();
   if (!days.length) return [];

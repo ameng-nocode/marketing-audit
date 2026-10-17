@@ -1,4 +1,4 @@
--- Step 1: the business, each check of it, and the Ads Manager screenshots added to a check.
+-- The business, each check of it, and the Ads Manager screenshots added to a check.
 
 -- One row per Facebook page. The same page entered again = the same business, a new check.
 create table businesses (
@@ -10,7 +10,7 @@ create table businesses (
   updated_at timestamptz not null default now()
 );
 
--- One row per marketing check (the plan calls it an audit).
+-- One row per marketing check.
 create table audits (
   id bigint generated always as identity primary key,
   business_id bigint not null references businesses(id),

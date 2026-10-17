@@ -1,5 +1,6 @@
 // Real logos (Simple Icons, CC0) of the channels the audit checks. They keep their own brand colours.
 // design-ok lines: brand colours are the brands' own, not part of the app palette.
+import type { Lang } from "@/lib/i18n";
 
 export type Channel = { key: string; label: string; fill: string; d: string };
 
@@ -26,7 +27,7 @@ export const facebook = CHANNELS[0];
 // The channels every check covers, sliding past at the bottom of the flow.
 // 4 identical sets slide left by one set, so the strip stays full even on a 2800px screen.
 // Platform names stay English in 中文 too; only "Website" changes.
-export function ChannelStrip({ lang = "en" }: { lang?: "en" | "zh" }) {
+export function ChannelStrip({ lang = "en" }: { lang?: Lang }) {
   return (
     <div className="g-strip" aria-label={lang === "zh" ? "检查会看的渠道" : "Channels the check covers"}>
       <div className="g-strip-track">

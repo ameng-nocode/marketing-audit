@@ -1,4 +1,4 @@
--- Step 5B: what they charge and what they keep from one sale, so the report can work out break-even from their own numbers.
+-- What they charge and what they keep from one sale, so the report can work out break-even from their own numbers.
 -- Price in RM: one price = price_low only. Profit: RM per sale or margin %, either one; both empty = not sure.
 
 alter table audits add column price_low numeric check (price_low > 0);

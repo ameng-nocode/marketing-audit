@@ -3,8 +3,9 @@ import { HOUSE } from "../ai-rules";
 import { q } from "../db";
 import { openAd, readResults, saveFound } from "./adlib";
 import { nameKey, Skipped, type Ctx } from "./kit";
+import { dayIn } from "../settings";
 
-// Check 4: who else sells the same thing with ads right now, and how (skill step 5).
+// Check 4: who else sells the same thing with ads right now, and how.
 
 // What we know about the business so far, as plain lines for the AI.
 export async function bizBrief(c: Ctx) {
@@ -69,7 +70,7 @@ export async function competitorPick(c: Ctx) {
     `select library_id, page_name, to_char(started_on, 'YYYY-MM-DD') started_on, versions, body, cta, search_word from ads where audit_id = $1 and not own order by position`, [c.auditId]);
   if (!ads.length) throw new Skipped("The searches found no live ads.");
   const list = ads.map((a) => `- id ${a.library_id} | page: ${a.page_name ?? "?"} | since ${a.started_on ?? "?"} | ${a.versions ? `${a.versions} versions` : "1 version"} | button: ${a.cta ?? "none"} | word: ${a.search_word} | copy: ${(a.body ?? "").replace(/\s+/g, " ").slice(0, 220)}`).join("\n");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dayIn();
   const a = await askJson<Pick>({
     auditId: c.auditId, task: "competitor-pick", model: "sonnet", system: HOUSE,
     prompt: `${await bizBrief(c)}

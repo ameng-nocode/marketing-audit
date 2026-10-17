@@ -5,15 +5,16 @@ import { q } from "../db";
 import { rm, shortUrl } from "../format";
 import { leadsTo } from "../collect/adlib";
 import { SLOP_WORDS } from "../ai-rules";
-import { Skipped, type Ctx } from "../collect/kit";
+import { launch, Skipped, type Ctx } from "../collect/kit";
 import { loadReportData, reelMonths, type RAd, type ReportData } from "./data";
-import { breakEvenLine, funnelSteps, moneyBrief, moneyOf, ownerQuestions } from "./money";
-import { consultant, consultantName, Consultant, TIME_ZONE } from "../settings";
+import { breakEvenLine, funnelSteps, moneyBrief, moneyOf, ownerQuestions, UNIT_WORD } from "./money";
+import { consultant, consultantName, Consultant, dayIn, TIME_ZONE, tzName } from "../settings";
+import type { Lang } from "../i18n";
 import { brief, loadTexts } from "./write";
 import { loadZhStrings, MAINLAND, strKey } from "./write-zh";
 
 // Check 7, step 2: the report page. The <style>, the icons and the photo viewer come straight from the
-// skill's locked template (lib/report/report-template.html), so the look can't drift. Code fills every number.
+// fixed template (lib/report/report-template.html), so the look can't drift. Code fills every number.
 
 const TEMPLATE = () => fs.readFileSync(path.join(process.cwd(), "lib", "report", "report-template.html"), "utf8");
 function parts() {
@@ -45,7 +46,7 @@ type Src = { shot: (id: string) => string; upload: (id: string) => string };
 export type Mode = "page" | "embed" | "print";
 
 // Added for the app, after the template's own style (which stays as it is): one frame per photo kind,
-// Reel previews, number tiles, tracking tiles and spend bars, all in the template's colours.
+// Reel previews, number tiles and tracking tiles, all in the template's colours.
 const ADDED = `
   [hidden] { display: none !important; }
   .mflow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -78,14 +79,9 @@ const ADDED = `
   .track { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 10px; }
   .track > div { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 8px; align-content: start; }
   .track b { font-size: 14px; font-weight: 600; }
-  .hbars { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
-  .hbar { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13.5px; }
-  .bar-track { height: 12px; }
-  .bar-track i { display: block; height: 100%; background: var(--ink-2); border-radius: 4px; }
-  .hbar .num { font-family: var(--mono); font-size: 12.5px; }
   .seen { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 10px; }
   .seen figure { width: 48px; flex: none; }
-  @media (max-width: 640px) { .hbar { grid-template-columns: minmax(0, 1fr) auto; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }`;
+`;
 
 const EMBED = `
   .topbar { display: none; }
@@ -101,7 +97,7 @@ const PRINT = `
   main > section:not(#glance) { break-before: page; }
   .sec { grid-template-columns: minmax(0, 1fr); }
   .sec-aside { position: static; }
-  figure, .card, .box, .tile, .track > div, .plan-row, .chan-row, tr, .fun, .reel, .row, .hbar, .why4 > div, .loop li, .chart { break-inside: avoid; }
+  figure, .card, .box, .tile, .track > div, .plan-row, .chan-row, tr, .fun, .reel, .row, .why4 > div, .loop li, .chart { break-inside: avoid; }
   h2, h3 { break-after: avoid; }
   a { text-decoration: none; }
   /* Cover and the summary share page 1. */
@@ -135,9 +131,8 @@ const EMBED_SCRIPT = `<script>
 })();
 </script>`;
 
-export type Lang = "en" | "zh";
 
-// The code's own fixed words in 大马华语 (wording from the approved 中文 report where it had one).
+// The code's own fixed words in 大马华语.
 const ZH_ITEMS: Record<string, string> = {
   "Headline says what they sell": "标题说清楚卖什么",
   "Headline is short": "标题够短",
@@ -160,7 +155,7 @@ export function buildHtml(d: ReportData, T: Awaited<ReturnType<typeof loadTexts>
   const ymd = (s: string) => ({ y: +s.slice(0, 4), m: +s.slice(5, 7), d: +s.slice(8, 10) });
   const dLong = (iso: string) => {
     if (!zh) return longDate(iso);
-    const x = ymd(new Date(Date.parse(iso) + 8 * 3600e3).toISOString());
+    const x = ymd(dayIn(iso));
     return `${x.y}年${x.m}月${x.d}日`;
   };
   const dShort = (s: string | null) => (!s ? "" : zh ? `${ymd(s).y}年${ymd(s).m}月${ymd(s).d}日` : shortDate(s));
@@ -283,17 +278,17 @@ export function buildHtml(d: ReportData, T: Awaited<ReturnType<typeof loadTexts>
   // The screenshot rows themselves are not repeated (the screenshots are in the proof below).
   const tile = (big: string, lab: string, bad = false) => `<div class="tile"><span class="big${bad ? " bad" : ""}">${esc(big)}</span><span class="lab">${esc(lab)}</span></div>`;
   const m = moneyOf(d);
-  const UNIT_ONE: Record<string, [string, string]> = { chat: ["chat", "每个聊天"], lead: ["lead", "每个 lead"], purchase: ["purchase", "每单购买"] };
-  const UNIT_MANY: Record<string, [string, string]> = { chat: ["chats", "个聊天"], lead: ["leads", "个 lead"], purchase: ["purchases", "单购买"] };
+  const UNIT_ONE = (u: NonNullable<typeof m.unit>) => UNIT_WORD[u].one;
+  const UNIT_MANY = (u: NonNullable<typeof m.unit>) => UNIT_WORD[u].many;
   const span = (lo: number, hi: number, f: (n: number) => string = String) => (lo === hi ? f(lo) : `${f(lo)} ${tr("to", "到")} ${f(hi)}`);
   const beLine = breakEvenLine(m, zh);
   const steps = funnelSteps(m, zh);
   const asks = ownerQuestions(m, zh);
   const insights = T.list("money", "insight");
   const moneyTiles = [
-    m.cpr && m.unit ? tile(rm(m.cpr), tr(`per ${UNIT_ONE[m.unit][0]}, worked out from the screenshots`, `${UNIT_ONE[m.unit][1]}, 从截图算出来`), !!m.breakEven && m.breakEven.hi < 1) : "",
-    m.breakEven && m.breakEven.hi >= 1 && m.unit ? tile(zh ? span(m.breakEven.lo, m.breakEven.hi) : `1 in ${span(m.breakEven.lo, m.breakEven.hi)}`, tr(`${UNIT_MANY[m.unit][0]} buying is enough for the ads to pay`, `${UNIT_MANY[m.unit][1]}里成交 1 个, 广告就回本`)) : "",
-    m.perSale ? tile(span(m.perSale.left.lo, m.perSale.left.hi, rm), tr("left per purchase after the ad cost", "每单扣掉广告费还剩"), m.perSale.left.hi <= 0) : "",
+    m.cpr && m.unit ? tile(rm(m.cpr), tr(`per ${UNIT_ONE(m.unit)[0]}, worked out from the screenshots`, `${UNIT_ONE(m.unit)[1]}, 从截图算出来`), !!m.breakEven && m.breakEven.hi < 1) : "",
+    m.breakEven && m.breakEven.hi >= 1 && m.unit ? tile(zh ? span(m.breakEven.lo, m.breakEven.hi) : `1 in ${span(m.breakEven.lo, m.breakEven.hi)}`, tr(`${UNIT_MANY(m.unit)[0]} buying is enough for the ads to pay`, `${UNIT_MANY(m.unit)[1]}里成交 1 个, 广告就回本`)) : "",
+    m.perSale ? tile(span(m.perSale.left.lo, m.perSale.left.hi, rm), tr("left per purchase after the ad cost", "一单扣掉广告费还剩"), m.perSale.left.hi <= 0) : "",
     m.roas ? tile(`${m.roas}x`, m.roasNeed ? tr(`ROAS now. They need ${span(m.roasNeed.lo, m.roasNeed.hi)}x to break even (price ÷ profit).`, `现在的 ROAS. 要 ${span(m.roasNeed.lo, m.roasNeed.hi)}x 才回本 (售价 ÷ 利润).`) : tr("ROAS shown in Ads Manager", "Ads Manager 显示的 ROAS"), !!m.roasNeed && m.roas < m.roasNeed.lo) : "",
     m.total ? tile(rm(m.total), tr("spent in the rows on the screenshots", "截图里看得到的花费")) : "",
   ].filter(Boolean).join("");
@@ -302,13 +297,13 @@ export function buildHtml(d: ReportData, T: Awaited<ReturnType<typeof loadTexts>
       ${T.t("money", "verdict") ? `<p class="lead">${rich(T.t("money", "verdict"))}</p>` : ""}
       ${moneyTiles ? `<div class="tiles">${moneyTiles}</div>` : ""}
       ${steps.length ? `<div class="block"><h3 class="sub">${tr("Their funnel, step by step", "他们的成交流程")}</h3><ol class="mflow">${steps.map((s) => `<li class="${s.value ? "known" : ""}"><b>${esc(s.label)}</b><span>${esc(s.value ?? tr("Ask the owner", "问老板"))}</span></li>`).join("")}</ol></div>` : ""}
-      ${beLine ? `<p class="be">${esc(beLine)}</p>` : `<p class="muted" style="font-size:13.5px">${!m.cpr ? tr("The screenshots show no chats, leads or purchases with a count, so the cost per result can't be worked out.", "截图里看不到聊天, lead 或购买的数量, 所以算不出每个成效的成本.") : tr("Add what they keep from one sale (edit the check) to see if the ads pay.", "填上每单的利润 (编辑这个检查), 就能看到广告有没有回本.")}</p>`}
+      ${beLine ? `<p class="be">${esc(beLine)}</p>` : `<p class="muted" style="font-size:13.5px">${!m.cpr ? tr("The screenshots show no chats, leads or purchases with a count, so the cost per result can't be worked out.", "截图里看不到聊天, lead 或购买的数量, 所以算不出每个成效的成本.") : tr("Add what they keep from one sale (edit the check) to see if the ads pay.", "填上一单赚多少 (编辑这个检查), 就看得到广告有没有回本.")}</p>`}
       ${insights.length ? `<ul class="points">${insights.map((x) => `<li>${rich(x)}</li>`).join("")}</ul>` : ""}
       ${asks.length ? `<div class="box"><h3>${tr("Ask the owner", "要问老板的")}</h3><ol class="asks">${asks.map((x) => `<li>${esc(x)}</li>`).join("")}</ol></div>` : ""}
     </div>`
     : "";
   const ch3 = [...shotsOf(3, ["page", "ad"]).map(shotFig), ...d.uploads.map((u) => fig(u.id, u.original_name, `Ads Manager: ${esc(u.original_name)}`, true))];
-  // Number tiles, tracking tiles and spend bars: the ads at a glance.
+  // Number tiles and tracking tiles: the ads at a glance.
   const ownLive = fact("own_live");
   const oldest = own.map((a) => a.started_on).filter((x): x is string => !!x).sort()[0];
   const domainName = domain?.label.replace(/^Ads mentioning /, "") ?? "";
@@ -514,7 +509,7 @@ export function buildHtml(d: ReportData, T: Awaited<ReturnType<typeof loadTexts>
     <details class="src"><summary>${tr(`Sources (${sources.length} links)`, `资料来源 (${sources.length} 个连结)`)}</summary><ol class="sources">${sources.map(([u, t]) => `<li>${link(u, t)}</li>`).join("")}</ol></details>
   </div></section>
 
-  <footer>${tr(`Checked on ${checkedOn} (Malaysia time) without logging in. Follower and view counts change daily.`, `检查日期: ${checkedOn} (马来西亚时间), 没有登入任何 account. Followers 和观看次数每天都会变.`)}</footer>
+  <footer>${tr(`Checked on ${checkedOn} (${tzName()}) without logging in. Follower and view counts change daily.`, `检查日期: ${checkedOn} (${tzName("zh")}), 没有登入任何 account. Followers 和观看次数每天都会变.`)}</footer>
 </main>
 `;
   return `<!doctype html>
@@ -523,7 +518,7 @@ export function buildHtml(d: ReportData, T: Awaited<ReturnType<typeof loadTexts>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@600;700;800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 ${style}
-<style>${ADDED}${mode === "embed" ? EMBED : ""}${mode === "print" ? PRINT : ""}</style>
+<style>${ADDED}${zh ? '.loop li::before { content: "第 " counter(lp) " 步"; }' : ""}${mode === "embed" ? EMBED : ""}${mode === "print" ? PRINT : ""}</style>
 </head><body>
 ${icons}
 ${mode === "print" ? body.replace('<details class="src">', '<details class="src" open>') : body}
@@ -532,7 +527,7 @@ ${mode === "embed" ? EMBED_SCRIPT : ""}
 </body></html>`;
 }
 
-// The text check (skill step 8): AI-slop words, mainland words in 中文, done-for-you wording, and numbers that aren't in the data.
+// The text check: AI-slop words, mainland words in 中文, done-for-you wording, and numbers that aren't in the data.
 // Dashes, semicolons and emoji need no flag: the page swaps them out (clean). Their own quoted lines are never checked for wording.
 const escRe = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const SLOP = new RegExp(`\\b(${SLOP_WORDS.map(escRe).join("|")})\\b`, "i");
@@ -574,7 +569,7 @@ async function pageFor(auditId: string, lang: Lang, day: string, mode: Mode) {
 }
 
 export async function renderReport(c: Ctx) {
-  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  const today = dayIn();
   const made: Lang[] = [];
   let flagCount = 0;
   for (const lang of ["en", "zh"] as Lang[]) {
@@ -601,7 +596,7 @@ export async function renderReport(c: Ctx) {
 // The report page as the code draws it now, from the saved words and data (so a fix to the page shows on old reports too).
 // Dates count from the day the report was made, not today.
 export async function currentHtml(auditId: string, madeAt: string, mode: Mode = "page", lang: Lang = "en") {
-  const day = new Date(Date.parse(madeAt) + 8 * 3600e3).toISOString().slice(0, 10);
+  const day = dayIn(madeAt);
   return (await pageFor(auditId, lang, day, mode))?.html ?? null;
 }
 
@@ -618,7 +613,6 @@ export function reportPdf(auditId: string, madeAt: string, lang: Lang = "en"): P
       const html = await currentHtml(auditId, madeAt, "print", lang);
       if (!html) return null;
       const full = await inlineImages(auditId, html);
-      const { launch } = await import("../collect/kit");
       const browser = await launch();
       try {
         const page = await browser.newPage();

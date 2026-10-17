@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { getCheck } from "@/lib/checks";
 import { reportPdf } from "@/lib/report/render";
-import { getReport, isLang, reportFileName } from "@/lib/reports";
+import { isLang } from "@/lib/i18n";
+import { getReport, reportFileName } from "@/lib/reports";
 
 // The report as a PDF (A4, photos inside), to open, keep or send. ?lang=zh = the 中文 one.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -6,7 +6,8 @@ import { Skipped, type Ctx } from "../collect/kit";
 import { loadReportData, reelMonths, type ReportData } from "./data";
 import { moneyBrief, moneyOf } from "./money";
 import { priceText, profitText } from "../format";
-import { consultant, Consultant } from "../settings";
+import { consultant, Consultant, dayIn, tzName } from "../settings";
+import type { Lang } from "../i18n";
 
 // Check 7, step 1: the AI writes the words of the report. Code already has every number;
 // the AI may only repeat numbers that are in the data below (the text check flags any other).
@@ -167,7 +168,7 @@ What they sell (from the form): ${d.biz.description ?? "not given"}
 Price (from the form): ${priceText(d.biz.price_low, d.biz.price_high, d.biz.price_unit) || "not sure"}
 Profit per sale (from the form): ${profitText(d.biz.profit_rm, d.biz.profit_pct) || "not sure"}
 Running ads (from the form): ${d.biz.running_ads}
-Checked on: ${today} (Malaysia time), logged out.
+Checked on: ${today} (${tzName()}), logged out.
 
 CHECK 1 CHANNELS
 ${f(1)}
@@ -211,7 +212,7 @@ ${notDone.join("\n") || "- nothing"}`;
 export async function writeReport(c: Ctx) {
   const d = await loadReportData(c.auditId);
   if (!d) throw new Skipped("The check is gone.");
-  const today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  const today = dayIn();
   const data = brief(d, today);
   const w = await askJson<Written>({
     auditId: c.auditId, task: "write-report", model: "opus", system: HOUSE, timeoutMs: 600000,
@@ -258,7 +259,7 @@ HOW TO WRITE
 
 // The writer's words go into texts (one row per piece), funnels and the ads they name.
 // lang en replaces everything (the 中文 words were made from the old English, so they go too). lang zh replaces only the 中文.
-export async function saveWritten(auditId: string, w: Written, d: ReportData, lang: "en" | "zh" = "en") {
+export async function saveWritten(auditId: string, w: Written, d: ReportData, lang: Lang = "en") {
   const rows: [string, string, number, string][] = [];
   const add = (section: string, key: string, body: string | null | undefined, pos = 0) => { if (body != null && String(body).trim()) rows.push([section, key, pos, String(body)]); };
   add("cover", "company_line", w.company_line);
@@ -320,14 +321,14 @@ export async function saveWritten(auditId: string, w: Written, d: ReportData, la
   });
 }
 
-// House style for 大马华语: half-width ", " and ". " (as in the approved 中文 report), no semicolons or dashes.
+// House style for 大马华语: half-width ", " and ". ", no semicolons or dashes.
 export const zhPunct = (s: string) =>
   s.replace(/\s*[，、]\s*/g, ", ").replace(/\s*。\s*/g, ". ").replace(/\s*[；;]\s*/g, ". ").replace(/\s*：\s*/g, ": ")
     .replace(/\s*！\s*/g, "! ").replace(/\s*？\s*/g, "? ").replace(/（/g, " (").replace(/）/g, ") ").replace(/\s*(——|—|–)\s*/g, ", ")
     .replace(/……/g, "...").replace(/[“”]/g, '"').replace(/ {2,}/g, " ").replace(/ ([,.!?:)])/g, "$1").trim();
 
 // Texts back as a lookup: t("cta", "lead"), list("plan", "question"). Section "str" holds the 中文 of the code's own words (see write-zh.ts).
-export async function loadTexts(auditId: string, lang: "en" | "zh" = "en") {
+export async function loadTexts(auditId: string, lang: Lang = "en") {
   const rows = await q<{ section: string; key: string; position: number; body: string }>(
     `select section, key, position, body from texts where audit_id = $1 and lang = $2 and section <> 'str' order by section, key, position`, [auditId, lang]);
   const t = (section: string, key: string, pos = 0) => rows.find((r) => r.section === section && r.key === key && r.position === pos)?.body ?? null;

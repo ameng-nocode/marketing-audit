@@ -1,5 +1,6 @@
 import { currentHtml } from "@/lib/report/render";
-import { getReport, isLang } from "@/lib/reports";
+import { isLang } from "@/lib/i18n";
+import { getReport } from "@/lib/reports";
 
 // The report page itself: its own locked look, so it is served as a whole HTML page, not inside the app's layout.
 // ?embed=1 is the copy shown inside the check page (no top bar; photos open in the app's viewer). ?lang=zh = 中文.

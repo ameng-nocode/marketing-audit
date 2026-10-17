@@ -1,4 +1,4 @@
--- Step 4B: TikTok through Apify when TikTok shows a puzzle. Their newest videos, and every paid Apify run.
+-- TikTok through Apify when TikTok shows a puzzle. Their newest videos, and every paid Apify run.
 
 create table tiktok_videos (
   id bigint generated always as identity primary key,

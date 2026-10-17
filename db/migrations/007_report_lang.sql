@@ -1,4 +1,4 @@
--- Step 5: the report in English or 中文 (大马华语). The language picked at the start, and the words per language.
+-- The report in English or 中文 (大马华语). The language picked at the start, and the words per language.
 
 alter table audits add column report_lang text not null default 'en' check (report_lang in ('en', 'zh'));
 

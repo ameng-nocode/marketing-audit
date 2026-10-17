@@ -5,7 +5,7 @@ import { q } from "./db";
 import { fakeAnswer } from "./ai-fake";
 
 // The AI is the Claude app already logged in on this PC, run headless (`claude -p`). No API key.
-// Lessons from earlier apps on this PC: no MCP servers, no user settings, an empty working folder,
+// Kept minimal on purpose: no MCP servers, no user settings, an empty working folder,
 // "@" swapped for a full-width one (the CLI reads "@word" as a file), and an empty answer is a failure.
 
 export type AiModel = "sonnet" | "opus";

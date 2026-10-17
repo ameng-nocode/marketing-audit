@@ -91,7 +91,6 @@
 }
 
 @layer components {
-  .mono { font-family: var(--font-dm-mono), ui-monospace, "PingFang SC", "Microsoft YaHei", monospace; }
   .num { font-variant-numeric: tabular-nums; }
 
   /* page shell and top bar */
@@ -174,6 +173,8 @@
   .g-money { width: 100%; max-width: 680px; display: flex; align-items: center; gap: 12px; }
   .g-money .g-bar { flex: 1 1 0; min-width: 0; }
   .g-money-to { flex: none; font-weight: 600; font-size: 16px; color: var(--navy-2); }
+  .g-unit-pick { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+  .g-unit-label { font-weight: 600; font-size: 16px; color: var(--navy-2); }
   @media (max-width: 560px) { .g-money { flex-direction: column; gap: 8px; } .g-money .g-bar { flex: none; width: 100%; } }
   .g-go { width: 54px; height: 54px; border-radius: 99px; border: 0; background: var(--navy); color: #fff; display: grid; place-items: center; cursor: pointer; flex: none; transition: background 0.2s; }
   .g-go:hover { background: var(--cyan); color: var(--navy); }
@@ -260,7 +261,7 @@
   .g-seg { display: inline-flex; align-items: center; gap: 2px; padding: 3px; height: 40px; border-radius: 99px; background: var(--panel); box-shadow: var(--shadow-sm); }
   .g-seg-btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: transparent; color: var(--navy-2); font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background 0.15s, color 0.15s; }
   .g-seg-btn:hover { color: var(--navy); }
-  .g-seg-btn[aria-pressed="true"], .g-seg-btn[aria-current="true"] { background: var(--navy); color: #fff; }
+  .g-seg-btn[aria-pressed="true"] { background: var(--navy); color: #fff; }
   /* Narrow phones: the mark alone, so the language switch and All checks fit */
   @media (max-width: 480px) { .g-brand-text { display: none; } }
 
@@ -274,7 +275,7 @@
   .modal { margin: auto; }
 
   @media (prefers-reduced-motion: reduce) {
-    .g-strip-track, .g-fw img, .g-q > *, .g-ring-p, .g-mark::after { animation: none; }
+    .g-strip-track, .g-fw img, .g-q > *, .g-ring-p, .g-mark::after, .g-file, .g-tag.is-running::before, .g-run-obj.busy img, .g-step-icon.running { animation: none; }
   }
   @media (max-height: 940px) and (min-width: 701px) {
     .g-q { gap: 16px; }

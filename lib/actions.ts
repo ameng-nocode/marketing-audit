@@ -8,7 +8,7 @@ import { getLang } from "./lang-server";
 
 export type FormState = { errors?: FieldErrors; message?: string };
 
-// New check: save, then start checks 1 to 3. Edit: save only.
+// New check: save, then start the run. Edit: save, and rewrite the report when the price or profit changed.
 export async function saveCheckAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const id = String(fd.get("id") ?? "") || undefined;
   let saved: string;

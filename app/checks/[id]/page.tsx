@@ -107,7 +107,7 @@ export default async function CheckPage({ params }: { params: Promise<{ id: stri
               <Fact label={t("Website", "网站")}>{c.website ? <span className="flex items-center gap-2"><BrandIcon c={website} size={18} /><Out href={c.website} /></span> : none}</Fact>
               <Fact label={t("What they sell", "卖什么")}>{c.description ? <span className="whitespace-pre-line">{c.description}</span> : none}</Fact>
               <Fact label={t("Price", "售价")}>{priceText(c.price_low, c.price_high, c.price_unit, lang) || <span className="text-muted">{t("Not sure", "不确定")}</span>}</Fact>
-              <Fact label={t("Profit per sale", "每单利润")}>{profitText(c.profit_rm, c.profit_pct, lang) || <span className="text-muted">{t("Not sure", "不确定")}</span>}</Fact>
+              <Fact label={t("Profit per sale", "一单赚多少")}>{profitText(c.profit_rm, c.profit_pct, lang) || <span className="text-muted">{t("Not sure", "不确定")}</span>}</Fact>
               <Fact label={t("Running ads", "有跑广告吗")}>{runningAdsLabel(c.running_ads, lang)}{c.running_ads === "yes" ? t(`, ${uploads.length} ${uploads.length === 1 ? "screenshot" : "screenshots"}`, `, ${uploads.length} 张截图`) : ""}</Fact>
             </div>
             {c.running_ads === "yes" && uploads.length > 0 && <Shots shots={uploads} />}

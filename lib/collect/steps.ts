@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { q } from "../db";
 import { shortUrl } from "../format";
+import { dayIn } from "../settings";
 import { renderReport } from "../report/render";
 import { writeReport } from "../report/write";
 import { writeReportZh } from "../report/write-zh";
@@ -9,9 +10,9 @@ import { competitorAds, competitorPick, competitorSearch, searchWords } from "./
 import { hooks } from "./creative";
 import { buying, foldReview, landings } from "./cta";
 import { tiktok as tiktokStep } from "./tiktok";
-import { clearFbPopup, countOf, fbPage, isCaptcha, isLoginWall, nameKey, NotChecked, Skipped, type Ctx } from "./kit";
+import { clearFbPopup, countOf, fbPage, isCaptcha, isLoginWall, nameKey, NotChecked, pageSetup, Skipped, type Ctx } from "./kit";
 
-// The steps of checks 1 to 6 and the report (7), in run order. Each one is a skill step (snippets S1 to S10) as code.
+// The steps of checks 1 to 6 and the report (7), in run order.
 // noBrowser: the step only reads what was collected (AI or code), so no browser is opened for it.
 export type StepDef = { key: string; check: 1 | 2 | 3 | 4 | 5 | 6 | 7; label: string; needsWebsite?: boolean; noBrowser?: boolean; run: (c: Ctx) => Promise<unknown> };
 
@@ -32,17 +33,15 @@ async function website(c: Ctx) {
     await c.fact({ key: "website", label: "Website", value: shortUrl(url), note: status ? `The site answers with error ${status}.` : "The site did not load.", status: "none", sourceUrl: url, shotId });
     return;
   }
-  // Skill snippet S1: title, social links in the HTML, platform.
+  // Title, social links in the HTML, platform, a shop or cart.
   const info = await c.page.evaluate((re) => {
     const html = document.documentElement.innerHTML;
     const social = [...new Set(html.match(new RegExp(re, "gi")) || [])];
-    const gen = document.querySelector('meta[name="generator"]')?.getAttribute("content") || "";
-    const w = window as unknown as { Shopify?: unknown };
-    const platform = w.Shopify ? "Shopify" : /wp-content|wp-includes/.test(html) ? "WordPress" : /wixstatic|wix\.com/.test(html) ? "Wix" : /squarespace/.test(html) ? "Squarespace" : gen.split(" ")[0] || "";
     const cart = /add to cart|checkout|cart/i.test(document.body.innerText);
-    return { title: document.title.slice(0, 120), social, platform, cart };
+    return { title: document.title.slice(0, 120), social, cart };
   }, SOCIAL.source);
-  const bits = [info.platform && `Built on ${info.platform}.`, info.cart ? "Has a shop or cart." : "", info.title && `Title: ${info.title}`].filter(Boolean);
+  const { platform } = await c.page.evaluate(pageSetup);
+  const bits = [platform && `Built on ${platform}.`, info.cart ? "Has a shop or cart." : "", info.title && `Title: ${info.title}`].filter(Boolean);
   await c.fact({ key: "website", label: "Website", value: shortUrl(url), note: bits.join(" "), status: "ok", sourceUrl: url, shotId });
   for (const link of info.social.filter((l) => !/facebook\.com\/(sharer|tr|plugins|dialog)/.test(l)).slice(0, 20)) {
     await c.fact({ key: "site_link", label: platformOf(link), value: link, note: "Found on the website", status: "info", sourceUrl: url });
@@ -89,7 +88,7 @@ async function facebook(c: Ctx) {
   // The page's own button (Send message, WhatsApp, Shop now ...), for check 5.
   const button = (text.match(/\n(Send message|Send WhatsApp message|WhatsApp|Shop now|Book now|Order now|Call now|Contact us|Sign up|Learn more|Get quote)\n/) || [])[1];
   await c.fact({ check: 5, key: "fb_button", label: "Facebook page button", value: button ?? "None shown", note: button ? null : "Logged out, no action button was shown next to Follow.", status: button ? "info" : "weak", sourceUrl: url, shotId });
-  // The newest post: its reactions and first words (skill: likes, the "AI content" label).
+  // The newest post: its reactions, first words and whether Facebook labels it as AI content.
   const at = text.indexOf("All reactions:");
   if (at > 0) {
     const before = text.slice(Math.max(0, at - 500), at).split("\n").map((s) => s.trim()).filter((s) => s && s !== "·");
@@ -141,7 +140,7 @@ async function maps(c: Ctx) {
   await c.open(url, 5000);
   const text = await c.text();
   if (isCaptcha(text)) throw new NotChecked("Google showed a check for robots.");
-  // Skill snippet S9. One match opens the place itself instead of a list. Each place: name + rating (reviews).
+  // One match opens the place itself instead of a list. Each place: name + rating (reviews).
   const places = await c.page.evaluate(() => {
     const rate = (t: string) => { const m = t.match(/(\d\.\d)\s*\(([\d,]+)\)/); return m ? `${m[1]} (${m[2]} reviews)` : /No reviews/i.test(t) ? "no reviews" : ""; };
     const list = [...document.querySelectorAll('[role="feed"] > div > div[jsaction], [role="article"]')].map((e) => (e as HTMLElement).innerText);
@@ -184,7 +183,7 @@ async function reels(c: Ctx) {
   await c.open(url, 4000);
   const text = await c.text();
   if (isLoginWall(text, c.page.url())) throw new NotChecked("Facebook asked to log in.");
-  // Skill snippet S4: views per Reel from the grid.
+  // Views per Reel from the grid.
   const list = await c.page.evaluate(() => {
     const r = [...document.querySelectorAll('a[href*="/reel/"]')].map((a) => ({ h: (a as HTMLAnchorElement).href.split("?")[0], v: (a as HTMLElement).innerText.trim() }));
     return [...new Map(r.map((x) => [x.h, x])).values()].slice(0, 10);
@@ -250,7 +249,7 @@ const saveData = (c: Ctx, caption: string, data: string | null, kind: "thumb" | 
 async function reelDates(c: Ctx) {
   const rows = await q<{ id: string; url: string }>(`select id::text, url from reels where audit_id = $1 order by position`, [c.auditId]);
   if (!rows.length) throw new Skipped("No Reels to date.");
-  // Skill snippet S10: the first creation_time on a Reel page is its post time.
+  // The first creation_time on a Reel page is its post time.
   // The 4 newest also keep their first seconds and caption, for the hook check in check 6.
   let dated = 0;
   for (const [i, r] of rows.entries()) {
@@ -259,7 +258,7 @@ async function reelDates(c: Ctx) {
     if (isLoginWall(text, c.page.url())) throw new NotChecked("Facebook asked to log in.");
     const m = (await c.page.content()).match(/"creation_time":(\d{10})/);
     if (m) {
-      const day = new Date(+m[1] * 1000 + 8 * 3600e3).toISOString().slice(0, 10);
+      const day = dayIn(+m[1] * 1000);
       await q(`update reels set posted_on = $2 where id = $1`, [r.id, day]);
       dated++;
     }
@@ -324,7 +323,7 @@ async function adDomain(c: Ctx) {
 }
 
 async function sameName(c: Ctx) {
-  // Skill snippet S5: choose "All ads", type the name, read the advertiser list.
+  // Choose "All ads", type the name, read the advertiser list.
   const url = "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=MY&media_type=all";
   await c.open(url, 4000);
   await c.page.getByRole("combobox", { name: /Ad category/i }).first().click({ timeout: 10000 });
@@ -356,17 +355,7 @@ async function tracking(c: Ctx) {
   let status = 0;
   try { status = await c.open(url, 3500); } catch { status = 0; }
   if (!status || status >= 400) throw new NotChecked("The website did not load.");
-  // Skill snippet S6.
-  const t = await c.page.evaluate(() => {
-    const w = window as unknown as Record<string, unknown>;
-    const s = [...document.scripts].map((x) => x.src + " " + x.text.slice(0, 500)).join("\n");
-    return {
-      meta: typeof w.fbq === "function" || /connect\.facebook\.net\/[^"']*fbevents/i.test(s),
-      ga: typeof w.gtag === "function" || !!w.google_tag_manager || /googletagmanager|google-analytics/i.test(s),
-      tiktok: typeof w.ttq === "object" || /analytics\.tiktok/i.test(s),
-      whatsapp: [...document.querySelectorAll('a[href*="wa.me"],a[href*="whatsapp"]')].map((a) => (a as HTMLAnchorElement).href).slice(0, 2),
-    };
-  });
+  const t = await c.page.evaluate(pageSetup);
   const rows: [string, boolean, string | null][] = [
     ["Meta pixel", t.meta, null],
     ["Google Analytics or Tag Manager", t.ga, null],

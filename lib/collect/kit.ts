@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,6 +6,29 @@ import type { Browser, Locator, Page } from "playwright-core";
 import { q } from "../db";
 import { uploadsDir } from "../checks";
 import { TIME_ZONE } from "../settings";
+
+// Runs ffmpeg (quiet, overwrite) on a video or picture link. ffmpeg must be on the PATH.
+export function ffmpeg(args: string[], timeoutMs = 60000) {
+  return new Promise<void>((resolve, reject) => {
+    execFile("ffmpeg", ["-y", "-loglevel", "error", ...args], { timeout: timeoutMs, windowsHide: true }, (e) => (e ? reject(e) : resolve()));
+  });
+}
+
+// What a page has installed: tracking pixels, WhatsApp links and the site builder.
+// Runs inside the page (pass it to page.evaluate), so it may only use the browser's own globals.
+export function pageSetup() {
+  const w = window as unknown as Record<string, unknown>;
+  const s = [...document.scripts].map((x) => x.src + " " + x.text.slice(0, 500)).join("\n");
+  const html = document.documentElement.innerHTML;
+  const gen = document.querySelector('meta[name="generator"]')?.getAttribute("content") || "";
+  return {
+    meta: typeof w.fbq === "function" || /fbevents/i.test(s),
+    ga: typeof w.gtag === "function" || !!w.google_tag_manager || /googletagmanager|google-analytics/i.test(s),
+    tiktok: typeof w.ttq === "object" || /analytics\.tiktok/i.test(s),
+    whatsapp: [...document.querySelectorAll('a[href*="wa.me"],a[href*="whatsapp"]')].map((a) => (a as HTMLAnchorElement).href).slice(0, 2),
+    platform: w.Shopify ? "Shopify" : /wp-content|wp-includes/.test(html) ? "WordPress" : /wixstatic|wix\.com/.test(html) ? "Wix" : /squarespace/.test(html) ? "Squarespace" : gen.split(" ")[0] || null,
+  };
+}
 
 // A login wall or CAPTCHA: the step is marked Not checked. Never solved or worked around.
 export class NotChecked extends Error {}
@@ -116,7 +140,7 @@ export function fbPage(url: string) {
   };
 }
 
-// The "log in or sign up" pop-up Facebook and Instagram lay over pages for logged-out visitors (skill snippet S3),
+// The "log in or sign up" pop-up Facebook and Instagram lay over pages for logged-out visitors,
 // plus the see-through layer behind it that greys out the page (and the logo).
 export async function clearFbPopup(page: Page) {
   await page.evaluate(() => {

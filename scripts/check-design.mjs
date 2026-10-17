@@ -21,7 +21,7 @@ const RULES = [
   // Brackets holding calc(), env(), var() or % are layout maths (safe areas, tab bar), not made-up numbers.
   { re: new RegExp(`(?<![\\w-])-?${SPACE}-\\[(?![^\\]]*(?:calc\\(|env\\(|var\\(|%))[^\\]]*\\]`, "g"), msg: "made-up spacing: use a 4px step (rule 3)" },
   { re: /(?<![\w-])(?:leading|tracking)-\[[^\]]*\]/g, msg: "made-up line height or letter spacing: the text size sets it (rule 1)" },
-  { re: /(?<![\w-])(?:text|bg|border|ring|fill|stroke|from|to|accent|outline|decoration)-\[(?:var\(|#|rgb)[^\]]*\]/g, msg: "colour by hand: use a named colour like text-ink-3 (rule 6)" },
+  { re: /(?<![\w-])(?:text|bg|border|ring|fill|stroke|from|to|accent|outline|decoration)-\[(?:var\(|#|rgb)[^\]]*\]/g, msg: "colour by hand: use a named colour like text-navy-2 (rule 6)" },
   { re: /["'\s(]#[0-9a-fA-F]{3,8}(?=["'\s);,])/g, msg: "hex colour in TSX: add a variable in globals.css (rule 6)" },
 ];
 

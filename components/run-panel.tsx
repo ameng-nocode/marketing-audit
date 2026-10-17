@@ -21,7 +21,7 @@ const WORD: Record<string, [string, string]> = {
   waiting: ["Waiting", "等待中"], running: ["Running", "进行中"], done: ["Done", "完成"], not_checked: ["Not checked", "没检查到"], skipped: ["Skipped", "跳过"], failed: ["Failed", "失败"],
 };
 
-// The 3 checks as a live list. Asks the app for progress every 2 seconds while a run is going.
+// The 7 check groups as a live list. Asks the app for progress every 2 seconds while a run is going.
 export function RunPanel({ auditId, initial }: { auditId: string; initial: Progress }) {
   const router = useRouter();
   const { lang, tr } = useLang();

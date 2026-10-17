@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Browser, Page } from "playwright-core";
 import { q, tx } from "./db";
+import type { Lang } from "./i18n";
 import { uploadsDir } from "./checks";
 import { launch, makeCtx, newPage, NotChecked, Skipped, type Biz } from "./collect/kit";
 import { DEPENDS, REPORT_KEYS, STEPS } from "./collect/steps";
@@ -29,9 +30,9 @@ function removeShotFiles(files: string[]) {
   for (const f of files) fs.rmSync(path.join(uploadsDir(), f), { force: true });
 }
 
-// Start (or start again): fresh steps for checks 1 to 3.
+// Start (or start again): a fresh set of all the steps.
 // lang = the app language of the person pressing Start: 中文 adds the 中文 report (a check that has one keeps it).
-export async function startRun(auditId: string, lang?: "en" | "zh") {
+export async function startRun(auditId: string, lang?: Lang) {
   await boot();
   const old = await tx(async (t) => {
     const files = await t<{ file: string }>(`select file from shots where audit_id = $1`, [auditId]);
@@ -70,7 +71,7 @@ export async function retryStep(stepId: string) {
 }
 
 // The 中文 report for a check that has the English one: pick 中文, then run the 中文 writer and the page again.
-// A check made before this step existed gets the step added just before "Build the report page".
+// A check whose steps don't include the 中文 writer gets it added just before "Build the report page".
 export async function makeChinese(auditId: string) {
   await boot();
   await q(`update audits set report_lang = 'zh' where id = $1`, [auditId]);

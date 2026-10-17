@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#f3f6fb" }; // design-ok: the browser meta tag needs a literal colour
 export const dynamic = "force-dynamic";
 
-// Every page draws its own top bar (G look: no side menu). The language (English or 中文) comes from the switch.
+// Every page draws its own top bar (Glossy look: no side menu). The language (English or 中文) comes from the switch.
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const lang = await getLang();
   return (

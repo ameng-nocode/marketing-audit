@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { one, q, tx } from "./db";
+import type { Lang } from "./i18n";
 import { bareUnit, checkFields, checkFile, IMAGE_TYPES, MAX_FILES, normalizeFacebook, normalizeWebsite, parseMoney, parsePct, type FieldErrors } from "./format";
 
 // Screenshots live on disk; the uploads table holds the record. UPLOADS_DIR lets the test copy use its own folder.
@@ -21,7 +22,7 @@ export type CheckRow = {
 export type Upload = { id: string; original_name: string; size_bytes: number; mime: string; file: string };
 
 export type Money = { price_low: number | null; price_high: number | null; price_unit: string | null; profit_rm: number | null; profit_pct: number | null };
-export type Check = CheckRow & Money & { business_id: string; description: string | null; report_lang: "en" | "zh"; uploads: Upload[] };
+export type Check = CheckRow & Money & { business_id: string; description: string | null; report_lang: Lang; uploads: Upload[] };
 
 export async function listChecks(): Promise<CheckRow[]> {
   return q<CheckRow>(
