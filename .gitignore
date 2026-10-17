@@ -1,0 +1,14 @@
+# Dependencies and builds
+node_modules
+.next
+.next-test
+.next-prod
+next-env.d.ts
+*.tsbuildinfo
+
+# Everything the app collects: database, screenshots, PDFs, AI logs. Never commit it.
+.data
+
+# Your settings and keys
+.env.local
+.env*.local
